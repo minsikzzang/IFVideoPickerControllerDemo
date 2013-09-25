@@ -22,6 +22,8 @@
 		A43F8D0D17F341F800CBD72F /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A43F8CEC17F341F800CBD72F /* UIKit.framework */; };
 		A43F8D1517F341F800CBD72F /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = A43F8D1317F341F800CBD72F /* InfoPlist.strings */; };
 		A43F8D1717F341F800CBD72F /* IFVideoPickerControllerDemoTests.m in Sources */ = {isa = PBXBuildFile; fileRef = A43F8D1617F341F800CBD72F /* IFVideoPickerControllerDemoTests.m */; };
+		A43F8D2217F3436F00CBD72F /* IFVideoPicker.m in Sources */ = {isa = PBXBuildFile; fileRef = A43F8D2117F3436F00CBD72F /* IFVideoPicker.m */; };
+		A43F8D2417F343FD00CBD72F /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A43F8D2317F343FD00CBD72F /* AVFoundation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -55,6 +57,9 @@
 		A43F8D1217F341F800CBD72F /* IFVideoPickerControllerDemoTests-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "IFVideoPickerControllerDemoTests-Info.plist"; sourceTree = "<group>"; };
 		A43F8D1417F341F800CBD72F /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		A43F8D1617F341F800CBD72F /* IFVideoPickerControllerDemoTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IFVideoPickerControllerDemoTests.m; sourceTree = "<group>"; };
+		A43F8D2017F3436F00CBD72F /* IFVideoPicker.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = IFVideoPicker.h; sourceTree = "<group>"; };
+		A43F8D2117F3436F00CBD72F /* IFVideoPicker.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = IFVideoPicker.m; sourceTree = "<group>"; };
+		A43F8D2317F343FD00CBD72F /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -62,6 +67,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A43F8D2417F343FD00CBD72F /* AVFoundation.framework in Frameworks */,
 				A43F8CEB17F341F800CBD72F /* CoreGraphics.framework in Frameworks */,
 				A43F8CED17F341F800CBD72F /* UIKit.framework in Frameworks */,
 				A43F8CE917F341F800CBD72F /* Foundation.framework in Frameworks */,
@@ -103,6 +109,7 @@
 		A43F8CE717F341F800CBD72F /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				A43F8D2317F343FD00CBD72F /* AVFoundation.framework */,
 				A43F8CE817F341F800CBD72F /* Foundation.framework */,
 				A43F8CEA17F341F800CBD72F /* CoreGraphics.framework */,
 				A43F8CEC17F341F800CBD72F /* UIKit.framework */,
@@ -122,6 +129,8 @@
 				A43F8D0117F341F800CBD72F /* ViewController.m */,
 				A43F8D0317F341F800CBD72F /* Images.xcassets */,
 				A43F8CEF17F341F800CBD72F /* Supporting Files */,
+				A43F8D2017F3436F00CBD72F /* IFVideoPicker.h */,
+				A43F8D2117F3436F00CBD72F /* IFVideoPicker.m */,
 			);
 			path = IFVideoPickerControllerDemo;
 			sourceTree = "<group>";
@@ -255,6 +264,7 @@
 			files = (
 				A43F8D0217F341F800CBD72F /* ViewController.m in Sources */,
 				A43F8CF917F341F800CBD72F /* AppDelegate.m in Sources */,
+				A43F8D2217F3436F00CBD72F /* IFVideoPicker.m in Sources */,
 				A43F8CF517F341F800CBD72F /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -474,6 +484,7 @@
 				A43F8D1C17F341F800CBD72F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		A43F8D1D17F341F800CBD72F /* Build configuration list for PBXNativeTarget "IFVideoPickerControllerDemoTests" */ = {
 			isa = XCConfigurationList;
@@ -482,6 +493,7 @@
 				A43F8D1F17F341F800CBD72F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
