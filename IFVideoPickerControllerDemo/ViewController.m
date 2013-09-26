@@ -44,6 +44,10 @@
 }
 
 - (void)dealloc {
+  if (videoPicker_ != nil) {
+    [videoPicker_ release];
+  }
+  
   [_textView release];
   [_textView release];
   [super dealloc];

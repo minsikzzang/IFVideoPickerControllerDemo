@@ -54,8 +54,5 @@ typedef void (^captureHandler)(CMSampleBufferRef sampleBuffer);
  */
 - (void)stopPreview;
 
-/**
- */
-- (void)stopAll;
 
 @end

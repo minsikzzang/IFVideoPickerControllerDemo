@@ -188,11 +188,7 @@ const char *VideoBufferQueueLabel = "com.ifactorylab.ifvideopicker.queue";
   if ([session canAddInput:newAudioInput]) {
     [session addInput:newAudioInput];
   }
-  /*
-  if ([session canAddOutput:newBufferOutput]) {
-    [session addOutput:newBufferOutput];
-  }
-  */
+
   [self setVideoInput:newVideoInput];
   [self setAudioInput:newAudioInput];
   [self setBufferOutput:newBufferOutput];

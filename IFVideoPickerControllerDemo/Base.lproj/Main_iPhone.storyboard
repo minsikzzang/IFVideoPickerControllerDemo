@@ -47,7 +47,6 @@
     </scenes>
     <resources>
         <image name="record.png" width="640" height="583"/>
-        <image name="record.png" width="640" height="583"/>
     </resources>
     <simulatedMetricsContainer key="defaultSimulatedMetrics">
         <simulatedStatusBarMetrics key="statusBar"/>
