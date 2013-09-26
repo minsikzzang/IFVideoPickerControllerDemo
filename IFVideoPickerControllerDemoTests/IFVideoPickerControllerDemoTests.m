@@ -2,8 +2,8 @@
 //  IFVideoPickerControllerDemoTests.m
 //  IFVideoPickerControllerDemoTests
 //
-//  Created by Min Kim on 9/25/13.
-//  Copyright (c) 2013 Min Kim. All rights reserved.
+//  Created by Min Kim on 3/25/13.
+//  Copyright (c) 2013 iFactory Lab Limited. All rights reserved.
 //
 
 #import <XCTest/XCTest.h>
