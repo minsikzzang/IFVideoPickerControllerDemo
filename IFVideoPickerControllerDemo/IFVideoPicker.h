@@ -7,6 +7,7 @@
 //
 
 #import <Foundation/Foundation.h>
+#import <AVFoundation/AVFoundation.h>
 #import "AVFoundation/AVCaptureSession.h"
 #import "AVFoundation/AVCaptureOutput.h"
 #import "AVFoundation/AVCaptureDevice.h"
@@ -22,8 +23,10 @@ typedef void (^captureHandler)(CMSampleBufferRef sampleBuffer);
 
 @property (nonatomic, retain) AVCaptureDeviceInput *videoInput;
 @property (nonatomic, retain) AVCaptureDeviceInput *audioInput;
-@property (nonatomic, retain) AVCaptureVideoDataOutput *bufferOutput;
+@property (nonatomic, retain) AVCaptureVideoDataOutput *videoBufferOutput;
+@property (nonatomic, retain) AVCaptureAudioDataOutput *audioBufferOutput;
 @property (nonatomic, retain) AVCaptureVideoPreviewLayer *captureVideoPreviewLayer;
+@property (nonatomic, retain) AVCaptureSession *session;
 @property (nonatomic, retain) UIView *videoPreviewView;
 @property (nonatomic, assign) BOOL isCapturing;
 
