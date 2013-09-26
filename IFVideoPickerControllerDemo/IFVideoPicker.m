@@ -9,11 +9,10 @@
 #import "IFVideoPicker.h"
 
 @interface IFVideoPicker () <AVCaptureVideoDataOutputSampleBufferDelegate> {
-  AVCaptureSession *session;
-  AVCaptureVideoPreviewLayer *preview;
+  AVCaptureSession *session_;
   id deviceConnectedObserver;
   id deviceDisconnectedObserver;
-  captureHandler sampleBufferHandler;
+  captureHandler sampleBufferHandler_;
 }
 
 - (AVCaptureDevice *)cameraWithPosition:(AVCaptureDevicePosition)position;
@@ -55,8 +54,8 @@ const char *VideoBufferQueueLabel = "com.ifactorylab.ifvideopicker.queue";
         deviceMediaType = AVMediaTypeVideo;
       }
       
-      if (deviceMediaType != nil && session != nil) {
-				for (AVCaptureDeviceInput *input in [session inputs]) {
+      if (deviceMediaType != nil && session_ != nil) {
+				for (AVCaptureDeviceInput *input in [session_ inputs]) {
 					if ([[input device] hasMediaType:deviceMediaType]) {
 						sessionHasDeviceWithMatchingMediaType = YES;
 						break;
@@ -66,8 +65,8 @@ const char *VideoBufferQueueLabel = "com.ifactorylab.ifvideopicker.queue";
 				if (!sessionHasDeviceWithMatchingMediaType) {
 					NSError	*error;
 					AVCaptureDeviceInput *input = [AVCaptureDeviceInput deviceInputWithDevice:device error:&error];
-					if ([session canAddInput:input])
-						[session addInput:input];
+					if ([session_ canAddInput:input])
+						[session_ addInput:input];
 				}
 			}
 			
@@ -83,14 +82,14 @@ const char *VideoBufferQueueLabel = "com.ifactorylab.ifvideopicker.queue";
       AVCaptureDevice *device = [notification object];
 			
 			if ([device hasMediaType:AVMediaTypeAudio]) {
-        if (session) {
-          [session removeInput:[weakSelf audioInput]];
+        if (session_) {
+          [session_ removeInput:[weakSelf audioInput]];
         }
         [weakSelf setAudioInput:nil];
 			}
 			else if ([device hasMediaType:AVMediaTypeVideo]) {
-        if (session) {
-          [session removeInput:[weakSelf videoInput]];
+        if (session_) {
+          [session_ removeInput:[weakSelf videoInput]];
         }
 				[weakSelf setVideoInput:nil];
 			}
@@ -178,15 +177,15 @@ const char *VideoBufferQueueLabel = "com.ifactorylab.ifvideopicker.queue";
   bufferOutput.videoSettings = videoSettings;
   
   // Create session (use default AVCaptureSessionPresetHigh)
-  session = [[AVCaptureSession alloc] init];
+  session_ = [[AVCaptureSession alloc] init];
   
   // Add inputs and output to the capture session
-  if ([session canAddInput:newVideoInput]) {
-    [session addInput:newVideoInput];
+  if ([session_ canAddInput:newVideoInput]) {
+    [session_ addInput:newVideoInput];
   }
   
-  if ([session canAddInput:newAudioInput]) {
-    [session addInput:newAudioInput];
+  if ([session_ canAddInput:newAudioInput]) {
+    [session_ addInput:newAudioInput];
   }
 
   [self setVideoInput:newVideoInput];
@@ -211,7 +210,7 @@ const char *VideoBufferQueueLabel = "com.ifactorylab.ifvideopicker.queue";
 
 - (void)startPreview:(UIView *)view withFrame:(CGRect)frame {
   AVCaptureVideoPreviewLayer *newCaptureVideoPreviewLayer =
-      [[AVCaptureVideoPreviewLayer alloc] initWithSession:session];
+      [[AVCaptureVideoPreviewLayer alloc] initWithSession:session_];
   
   CALayer *viewLayer = [view layer];
   [viewLayer setMasksToBounds:YES];
@@ -241,26 +240,27 @@ const char *VideoBufferQueueLabel = "com.ifactorylab.ifvideopicker.queue";
   
   // Start the session. This is done asychronously since -startRunning doesn't return until the session is running.
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-    [session startRunning];
+    [session_ startRunning];
   });
 }
 
 - (void)stopPreview {
-  if (session == nil) {
+  if (session_ == nil) {
     // Session has not created yet...
     return;
   }
   
-  if (session.isRunning) {
+  if (session_.isRunning) {
     // There is no active session running...
     NSLog(@"You need to run startPreview first");
     return;
   }
   
-  [session stopRunning];
+  [session_ stopRunning];
   
   SAFE_RELEASE(captureVideoPreviewLayer)
   SAFE_RELEASE(videoPreviewView)
+  SAFE_RELEASE(session_)
 }
 
 // Find a camera with the specificed AVCaptureDevicePosition, returning nil if one is not found
@@ -294,11 +294,11 @@ const char *VideoBufferQueueLabel = "com.ifactorylab.ifvideopicker.queue";
 }
 
 - (void)startCaptureWithBlock:(captureHandler)completionBlock {
-   if ([session canAddOutput:self.bufferOutput]) {
-     [session addOutput:self.bufferOutput];
+   if ([session_ canAddOutput:self.bufferOutput]) {
+     [session_ addOutput:self.bufferOutput];
    }
   
-  sampleBufferHandler = completionBlock;
+  sampleBufferHandler_ = completionBlock;
   [self setIsCapturing:YES];
 }
 
@@ -307,8 +307,8 @@ const char *VideoBufferQueueLabel = "com.ifactorylab.ifvideopicker.queue";
     return;
   }
   
-  [session removeOutput:self.bufferOutput];
-  sampleBufferHandler = nil;
+  [session_ removeOutput:self.bufferOutput];
+  sampleBufferHandler_ = nil;
   [self setIsCapturing:NO];
 }
 
@@ -318,7 +318,7 @@ const char *VideoBufferQueueLabel = "com.ifactorylab.ifvideopicker.queue";
 - (void) captureOutput:(AVCaptureOutput *)captureOutput
  didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
         fromConnection:(AVCaptureConnection *)connection {
-  if (sampleBufferHandler != nil) {
+  if (sampleBufferHandler_ != nil) {
     sampleBufferHandler(sampleBuffer);
   }
 }
