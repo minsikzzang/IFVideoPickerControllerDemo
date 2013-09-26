@@ -24,6 +24,7 @@
 		A43F8D1717F341F800CBD72F /* IFVideoPickerControllerDemoTests.m in Sources */ = {isa = PBXBuildFile; fileRef = A43F8D1617F341F800CBD72F /* IFVideoPickerControllerDemoTests.m */; };
 		A43F8D2217F3436F00CBD72F /* IFVideoPicker.m in Sources */ = {isa = PBXBuildFile; fileRef = A43F8D2117F3436F00CBD72F /* IFVideoPicker.m */; };
 		A43F8D2417F343FD00CBD72F /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A43F8D2317F343FD00CBD72F /* AVFoundation.framework */; };
+		A43F8D6A17F4743B00CBD72F /* record.png in Resources */ = {isa = PBXBuildFile; fileRef = A43F8D6917F4743B00CBD72F /* record.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,6 +61,7 @@
 		A43F8D2017F3436F00CBD72F /* IFVideoPicker.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = IFVideoPicker.h; sourceTree = "<group>"; };
 		A43F8D2117F3436F00CBD72F /* IFVideoPicker.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = IFVideoPicker.m; sourceTree = "<group>"; };
 		A43F8D2317F343FD00CBD72F /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+		A43F8D6917F4743B00CBD72F /* record.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = record.png; path = ../../../../Users/minkim/Desktop/record.png; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -121,6 +123,7 @@
 		A43F8CEE17F341F800CBD72F /* IFVideoPickerControllerDemo */ = {
 			isa = PBXGroup;
 			children = (
+				A43F8D6917F4743B00CBD72F /* record.png */,
 				A43F8CF717F341F800CBD72F /* AppDelegate.h */,
 				A43F8CF817F341F800CBD72F /* AppDelegate.m */,
 				A43F8CFA17F341F800CBD72F /* Main_iPhone.storyboard */,
@@ -244,6 +247,7 @@
 				A43F8D0417F341F800CBD72F /* Images.xcassets in Resources */,
 				A43F8CFC17F341F800CBD72F /* Main_iPhone.storyboard in Resources */,
 				A43F8CF317F341F800CBD72F /* InfoPlist.strings in Resources */,
+				A43F8D6A17F4743B00CBD72F /* record.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -402,6 +406,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
+				CLANG_ENABLE_OBJC_ARC = NO;
+				CLANG_WARN__ARC_BRIDGE_CAST_NONARC = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "IFVideoPickerControllerDemo/IFVideoPickerControllerDemo-Prefix.pch";
 				INFOPLIST_FILE = "IFVideoPickerControllerDemo/IFVideoPickerControllerDemo-Info.plist";
@@ -415,6 +421,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
+				CLANG_ENABLE_OBJC_ARC = NO;
+				CLANG_WARN__ARC_BRIDGE_CAST_NONARC = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "IFVideoPickerControllerDemo/IFVideoPickerControllerDemo-Prefix.pch";
 				INFOPLIST_FILE = "IFVideoPickerControllerDemo/IFVideoPickerControllerDemo-Info.plist";

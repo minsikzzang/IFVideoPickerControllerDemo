@@ -14,19 +14,48 @@
 #import "AVFoundation/AVCaptureVideoPreviewLayer.h"
 #import "AVFoundation/AVMediaFormat.h"
 
+typedef void (^captureHandler)(CMSampleBufferRef sampleBuffer);
+
 @interface IFVideoPicker : NSObject {
   
 }
 
+@property (nonatomic, retain) AVCaptureDeviceInput *videoInput;
+@property (nonatomic, retain) AVCaptureDeviceInput *audioInput;
+@property (nonatomic, retain) AVCaptureVideoDataOutput *bufferOutput;
+@property (nonatomic, retain) AVCaptureVideoPreviewLayer *captureVideoPreviewLayer;
+@property (nonatomic, retain) UIView *videoPreviewView;
+@property (nonatomic, assign) BOOL isCapturing;
+
+- (BOOL)startup;
+
+- (void)shutdown;
+
 /**
- * Init with the given IFVideoPickerDelegate.
+ @abstract
+  start preview of camera input
+ 
+ @param captureOutput
+
  */
-- (id)initWithDelegate:(IFVideoPickerDelegate *)delegate;
+- (void)startPreview:(UIView *)view;
 
-// - (void)startWithBlock:(xxx)startHandler;
+- (void)startPreview:(UIView *)view withFrame:(CGRect)frame;
 
-// - (void)stopWithBlock:(xxx)stopHandler;
+/**
+ */
+- (void)startCaptureWithBlock:(captureHandler)completionBlock;
 
+/**
+ */
+- (void)stopCapture;
 
+/**
+ */
+- (void)stopPreview;
+
+/**
+ */
+- (void)stopAll;
 
 @end

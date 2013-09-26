@@ -10,4 +10,9 @@
 
 @interface ViewController : UIViewController
 
+- (IBAction)recordButtonPushed:(id)sender;
+
+@property (retain, nonatomic) IBOutlet UITextField *textView;
+
+
 @end
