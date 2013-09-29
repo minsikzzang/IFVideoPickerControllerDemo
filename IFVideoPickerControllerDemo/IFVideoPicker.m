@@ -7,18 +7,24 @@
 //
 
 #import "IFVideoPicker.h"
+#import "IFVideoEncoder.h"
+#import "IFAudioEncoder.h"
+#import "IFAVAssetBaseEncoder.h"
 
 @interface IFVideoPicker () <AVCaptureVideoDataOutputSampleBufferDelegate,
     AVCaptureAudioDataOutputSampleBufferDelegate> {
   id deviceConnectedObserver;
   id deviceDisconnectedObserver;
   captureHandler sampleBufferHandler_;
+  encodedCaptureHandler encodedBufferHandler_;
+  IFAVAssetBaseEncoder *assetEncoder_;
 }
 
 - (AVCaptureDevice *)cameraWithPosition:(AVCaptureDevicePosition)position;
 - (AVCaptureDevice *)frontFacingCamera;
 - (AVCaptureDevice *)backFacingCamera;
 - (AVCaptureDevice *)audioDevice;
+- (void)startCapture;
 
 @end
 
@@ -29,8 +35,8 @@
 
 @implementation IFVideoPicker
 
-const char *VideoBufferQueueLabel = "com.ifactorylab.ifvideopicker.videoqueue";
-const char *AudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
+const char *kVideoBufferQueueLabel = "com.ifactorylab.ifvideopicker.videoqueue";
+const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
 
 @synthesize videoInput;
 @synthesize audioInput;
@@ -40,6 +46,8 @@ const char *AudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
 @synthesize videoPreviewView;
 @synthesize isCapturing;
 @synthesize session;
+@synthesize videoEncoder;
+@synthesize audioEncoder;
 
 - (id)init {
   self = [super init];
@@ -126,6 +134,8 @@ const char *AudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
   [notificationCenter removeObserver:deviceDisconnectedObserver];
 
   [self shutdown];
+  SAFE_RELEASE(assetEncoder_);
+  
   [super dealloc];
 }
 
@@ -138,27 +148,28 @@ const char *AudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
   
   // Set torch and flash mode to auto
   // We use back facing camera by default
-  if ([[self backFacingCamera] hasFlash]) {
-    if ([[self backFacingCamera] lockForConfiguration:nil]) {
-			if ([[self backFacingCamera] isFlashModeSupported:AVCaptureFlashModeAuto]) {
-				[[self backFacingCamera] setFlashMode:AVCaptureFlashModeAuto];
+  AVCaptureDevice *backFacingCaemra = [self backFacingCamera];
+  if ([backFacingCaemra hasFlash]) {
+    if ([backFacingCaemra lockForConfiguration:nil]) {
+			if ([backFacingCaemra isFlashModeSupported:AVCaptureFlashModeAuto]) {
+				[backFacingCaemra setFlashMode:AVCaptureFlashModeAuto];
 			}
-			[[self backFacingCamera] unlockForConfiguration];
+			[backFacingCaemra unlockForConfiguration];
 		}
   }
   
-  if ([[self backFacingCamera] hasTorch]) {
-    if ([[self backFacingCamera] lockForConfiguration:nil]) {
-			if ([[self backFacingCamera] isTorchModeSupported:AVCaptureTorchModeAuto]) {
-				[[self backFacingCamera] setTorchMode:AVCaptureTorchModeAuto];
+  if ([backFacingCaemra hasTorch]) {
+    if ([backFacingCaemra lockForConfiguration:nil]) {
+			if ([backFacingCaemra isTorchModeSupported:AVCaptureTorchModeAuto]) {
+				[backFacingCaemra setTorchMode:AVCaptureTorchModeAuto];
 			}
-			[[self backFacingCamera] unlockForConfiguration];
+			[backFacingCaemra unlockForConfiguration];
 		}
   }
   
   // Init the device inputs
   AVCaptureDeviceInput *newVideoInput =
-      [[AVCaptureDeviceInput alloc] initWithDevice:[self backFacingCamera]
+      [[AVCaptureDeviceInput alloc] initWithDevice:backFacingCaemra
                                              error:nil];
   AVCaptureDeviceInput *newAudioInput =
       [[AVCaptureDeviceInput alloc] initWithDevice:[self audioDevice]
@@ -166,7 +177,7 @@ const char *AudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
   
   // Set up the video YUV buffer output
   dispatch_queue_t videoCaptureQueue =
-      dispatch_queue_create(VideoBufferQueueLabel, DISPATCH_QUEUE_SERIAL);
+      dispatch_queue_create(kVideoBufferQueueLabel, DISPATCH_QUEUE_SERIAL);
   
   AVCaptureVideoDataOutput *newVideoOutput = [[AVCaptureVideoDataOutput alloc] init];
   [newVideoOutput setSampleBufferDelegate:self queue:videoCaptureQueue];
@@ -180,7 +191,7 @@ const char *AudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
   
   // Set up the audio buffer output
   dispatch_queue_t audioCaptureQueue =
-      dispatch_queue_create(AudioBufferQueueLabel, DISPATCH_QUEUE_SERIAL);
+      dispatch_queue_create(kAudioBufferQueueLabel, DISPATCH_QUEUE_SERIAL);
 
   AVCaptureAudioDataOutput *newAudioOutput = [[AVCaptureAudioDataOutput alloc] init];
   [newAudioOutput setSampleBufferDelegate:self queue:audioCaptureQueue];
@@ -224,6 +235,8 @@ const char *AudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
   SAFE_RELEASE(audioBufferOutput)
   SAFE_RELEASE(videoInput)
   SAFE_RELEASE(audioInput)
+  SAFE_RELEASE(audioEncoder)
+  SAFE_RELEASE(videoEncoder)
 }
 
 - (void)startPreview:(UIView *)view {
@@ -260,14 +273,15 @@ const char *AudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
   [self setCaptureVideoPreviewLayer:newCaptureVideoPreviewLayer];
   [newCaptureVideoPreviewLayer release];
   
-  // Start the session. This is done asychronously since -startRunning doesn't return until the session is running.
+  // Start the session. This is done asychronously since -startRunning doesn't
+  //mreturn until the session is running.
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-    [self.session startRunning];
+    [session startRunning];
   });
 }
 
 - (void)stopPreview {
-  if (self.session == nil) {
+  if (session == nil) {
     // Session has not created yet...
     return;
   }
@@ -278,7 +292,7 @@ const char *AudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
     return;
   }
   
-  [self.session stopRunning];
+  [session stopRunning];
   
   SAFE_RELEASE(captureVideoPreviewLayer)
   SAFE_RELEASE(videoPreviewView)
@@ -314,31 +328,64 @@ const char *AudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
   return nil;
 }
 
-- (void)startCaptureWithBlock:(captureHandler)completionBlock {
-  // add video and audio output to current capture session.
-  if ([self.session canAddOutput:self.videoBufferOutput]) {
-     [self.session addOutput:self.videoBufferOutput];
+// Add video and audio output objects to the current session to capture video
+// and audio stream from the session.
+- (void)startCapture {
+  // Add video and audio output to current capture session.
+  if ([session canAddOutput:videoBufferOutput]) {
+    [session addOutput:videoBufferOutput];
   }
   
-  if ([self.session canAddOutput:self.audioBufferOutput]) {
-    [self.session addOutput:self.audioBufferOutput];
+  if ([session canAddOutput:audioBufferOutput]) {
+    [session addOutput:audioBufferOutput];
   }
-  
-  sampleBufferHandler_ = completionBlock;
-  
+
   // Now, we are capturing
   [self setIsCapturing:YES];
 }
 
+- (void)startCaptureWithBlock:(captureHandler)completionBlock {
+  sampleBufferHandler_ = completionBlock;
+  
+  [self startCapture];
+}
+
+- (void)startCaptureWithEncoder:(IFVideoEncoder *)video
+                          audio:(IFAudioEncoder *)audio
+                   captureBlock:(encodedCaptureHandler)captureBlock {
+  videoEncoder = video;
+  audioEncoder = audio;
+  
+  // In order to use hardware acceleration encoding, we need to use
+  // AVAssetsWriter, and AVAssetsWriter only writes to file, so we need to
+  // create a file to contain encoded buffer and notify to captureBlock when
+  // change is detcted.
+  if (assetEncoder_ == nil) {
+    assetEncoder_ = [[IFAVAssetBaseEncoder alloc] init];
+  }
+  
+
+  [self startCapture];
+}
+
 - (void)stopCapture {
-  if (!self.isCapturing) {
+  if (!isCapturing) {
     return;
   }
   
-  // Pull out video and audio output from current capture session.
-  [self.session removeOutput:self.videoBufferOutput];
-  [self.session removeOutput:self.audioBufferOutput];
+  // Clean up video and audio encoder objects which might have been set eariler.
+  SAFE_RELEASE(audioEncoder)
+  SAFE_RELEASE(videoEncoder)
   
+  // If needed, stop before changing in current session.
+  // [self.session stopRunning];
+  
+  // Pull out video and audio output from current capture session.
+  [session removeOutput:videoBufferOutput];
+  [session removeOutput:audioBufferOutput];
+  
+  // If session has stopped before changing, start it again.
+  // [self.session startRunning];
   sampleBufferHandler_ = nil;
   
   // Now, we are not capturing
@@ -351,26 +398,45 @@ const char *AudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
 - (void) captureOutput:(AVCaptureOutput *)captureOutput
  didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
         fromConnection:(AVCaptureConnection *)connection {
-  CMFormatDescriptionRef formatDescription =
-      CMSampleBufferGetFormatDescription(sampleBuffer);
-  
-  if (connection == [videoBufferOutput connectionWithMediaType:AVMediaTypeVideo]) {
-    // CMTime timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
-    CMVideoDimensions videoDementions =
-        CMVideoFormatDescriptionGetDimensions(formatDescription);
-    // CMVideoCodecType videoType = CMFormatDescriptionGetMediaSubType(formatDescription);
-    
-    NSLog(@"Video stream coming, %dx%d", videoDementions.width,
-          videoDementions.height);
-  } else if (connection == [audioBufferOutput connectionWithMediaType:AVMediaTypeAudio]) {
-    NSLog(@"Audio stream coming");
-  }
-  
   /*
-  if (sampleBufferHandler_ != nil) {
-    sampleBufferHandler_(sampleBuffer);
-  }
+   // CMTime timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+   CMVideoDimensions videoDementions =
+   CMVideoFormatDescriptionGetDimensions(formatDescription);
+   // CMVideoCodecType videoType = CMFormatDescriptionGetMediaSubType(formatDescription);
+   
+   NSLog(@"Video stream coming, %dx%d", videoDementions.width,
+   videoDementions.height);
    */
+
+  IFCapturedBufferType bufferType = kBufferUnknown;
+  if (connection == [videoBufferOutput connectionWithMediaType:AVMediaTypeVideo]) {
+    bufferType = kBufferVideo;
+  } else if (connection == [audioBufferOutput connectionWithMediaType:AVMediaTypeAudio]) {
+    // NSLog(@"Audio stream coming");
+    bufferType = kBufferAudio;
+  }
+  
+  if (videoEncoder != nil && audioEncoder != nil) {
+    if (encodedBufferHandler_ != nil) {
+      if (bufferType == kBufferAudio) {
+        // If audio encoder is not ready to write, we need to setup it up with
+        // CMFormatDescriptionRef
+        if (audioEncoder.assetWriterInput == nil) {
+          CMFormatDescriptionRef formatDescription =
+              CMSampleBufferGetFormatDescription(sampleBuffer);
+          [audioEncoder setupWithFormatDescription:formatDescription];
+        }
+      }
+    } else {
+      NSLog(@"No encoded buffer capture handler exist");
+    }
+  } else {
+    if (sampleBufferHandler_ != nil) {
+      sampleBufferHandler_(sampleBuffer, bufferType);
+    } else {
+      NSLog(@"No sample buffer capture handler exist");
+    }
+  }
 }
 
 @end

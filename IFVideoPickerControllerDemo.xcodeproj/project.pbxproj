@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		93B99BC617F5C38100E9DA77 /* record.png in Resources */ = {isa = PBXBuildFile; fileRef = 93B99BC517F5C38100E9DA77 /* record.png */; };
+		93B99BC917F5C55E00E9DA77 /* IFVideoEncoder.m in Sources */ = {isa = PBXBuildFile; fileRef = 93B99BC817F5C55E00E9DA77 /* IFVideoEncoder.m */; };
+		93B99BCC17F5C57A00E9DA77 /* IFAudioEncoder.m in Sources */ = {isa = PBXBuildFile; fileRef = 93B99BCB17F5C57A00E9DA77 /* IFAudioEncoder.m */; };
+		93B99BCF17F5FA6600E9DA77 /* IFAVAssetBaseEncoder.m in Sources */ = {isa = PBXBuildFile; fileRef = 93B99BCE17F5FA6600E9DA77 /* IFAVAssetBaseEncoder.m */; };
 		A43F8CE917F341F800CBD72F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A43F8CE817F341F800CBD72F /* Foundation.framework */; };
 		A43F8CEB17F341F800CBD72F /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A43F8CEA17F341F800CBD72F /* CoreGraphics.framework */; };
 		A43F8CED17F341F800CBD72F /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A43F8CEC17F341F800CBD72F /* UIKit.framework */; };
@@ -39,6 +42,12 @@
 
 /* Begin PBXFileReference section */
 		93B99BC517F5C38100E9DA77 /* record.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = record.png; sourceTree = SOURCE_ROOT; };
+		93B99BC717F5C55E00E9DA77 /* IFVideoEncoder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = IFVideoEncoder.h; sourceTree = "<group>"; };
+		93B99BC817F5C55E00E9DA77 /* IFVideoEncoder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = IFVideoEncoder.m; sourceTree = "<group>"; };
+		93B99BCA17F5C57A00E9DA77 /* IFAudioEncoder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = IFAudioEncoder.h; sourceTree = "<group>"; };
+		93B99BCB17F5C57A00E9DA77 /* IFAudioEncoder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = IFAudioEncoder.m; sourceTree = "<group>"; };
+		93B99BCD17F5FA6600E9DA77 /* IFAVAssetBaseEncoder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = IFAVAssetBaseEncoder.h; sourceTree = "<group>"; };
+		93B99BCE17F5FA6600E9DA77 /* IFAVAssetBaseEncoder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = IFAVAssetBaseEncoder.m; sourceTree = "<group>"; };
 		A43F8CE517F341F800CBD72F /* IFVideoPickerControllerDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IFVideoPickerControllerDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A43F8CE817F341F800CBD72F /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		A43F8CEA17F341F800CBD72F /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
@@ -134,6 +143,12 @@
 				A43F8CEF17F341F800CBD72F /* Supporting Files */,
 				A43F8D2017F3436F00CBD72F /* IFVideoPicker.h */,
 				A43F8D2117F3436F00CBD72F /* IFVideoPicker.m */,
+				93B99BC717F5C55E00E9DA77 /* IFVideoEncoder.h */,
+				93B99BC817F5C55E00E9DA77 /* IFVideoEncoder.m */,
+				93B99BCA17F5C57A00E9DA77 /* IFAudioEncoder.h */,
+				93B99BCB17F5C57A00E9DA77 /* IFAudioEncoder.m */,
+				93B99BCD17F5FA6600E9DA77 /* IFAVAssetBaseEncoder.h */,
+				93B99BCE17F5FA6600E9DA77 /* IFAVAssetBaseEncoder.m */,
 			);
 			path = IFVideoPickerControllerDemo;
 			sourceTree = "<group>";
@@ -214,6 +229,9 @@
 				LastUpgradeCheck = 0500;
 				ORGANIZATIONNAME = "Min Kim";
 				TargetAttributes = {
+					A43F8CE417F341F800CBD72F = {
+						DevelopmentTeam = 24HX3ZLBBQ;
+					};
 					A43F8D0817F341F800CBD72F = {
 						TestTargetID = A43F8CE417F341F800CBD72F;
 					};
@@ -266,6 +284,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				93B99BCF17F5FA6600E9DA77 /* IFAVAssetBaseEncoder.m in Sources */,
+				93B99BCC17F5C57A00E9DA77 /* IFAudioEncoder.m in Sources */,
+				93B99BC917F5C55E00E9DA77 /* IFVideoEncoder.m in Sources */,
 				A43F8D0217F341F800CBD72F /* ViewController.m in Sources */,
 				A43F8CF917F341F800CBD72F /* AppDelegate.m in Sources */,
 				A43F8D2217F3436F00CBD72F /* IFVideoPicker.m in Sources */,
@@ -408,10 +429,13 @@
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
 				CLANG_ENABLE_OBJC_ARC = NO;
 				CLANG_WARN__ARC_BRIDGE_CAST_NONARC = YES;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "IFVideoPickerControllerDemo/IFVideoPickerControllerDemo-Prefix.pch";
 				INFOPLIST_FILE = "IFVideoPickerControllerDemo/IFVideoPickerControllerDemo-Info.plist";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Debug;
@@ -423,10 +447,13 @@
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
 				CLANG_ENABLE_OBJC_ARC = NO;
 				CLANG_WARN__ARC_BRIDGE_CAST_NONARC = YES;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "IFVideoPickerControllerDemo/IFVideoPickerControllerDemo-Prefix.pch";
 				INFOPLIST_FILE = "IFVideoPickerControllerDemo/IFVideoPickerControllerDemo-Info.plist";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Release;

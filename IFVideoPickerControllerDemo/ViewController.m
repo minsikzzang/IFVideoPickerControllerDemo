@@ -8,6 +8,8 @@
 
 #import "ViewController.h"
 #import "IFVideoPicker.h"
+#import "IFAudioEncoder.h"
+#import "IFVideoEncoder.h"
 
 @interface ViewController () {
   IFVideoPicker *videoPicker_;
@@ -37,9 +39,41 @@
     [videoPicker_ stopCapture];
   } else {
     self.textView.text = @"Recording...";
-    [videoPicker_ startCaptureWithBlock:^(CMSampleBufferRef sampleBuffer) {
-      NSLog(@"I've got some buffers");
+    
+    // audio 320kbos, samplerate 44100
+    IFAudioEncoder *ae =
+        [IFAudioEncoder createAACAudioWithBitRate:320000 sampleRate:44100];
+    
+    // video 500kbps, 512x288
+    CMVideoDimensions dimensions;
+    dimensions.width = 512;
+    dimensions.height = 288;
+    
+    IFVideoEncoder *ve =
+        [IFVideoEncoder createH264VideoWithDimensions:dimensions
+                                              bitRate:500000
+                                          maxKeyFrame:200];
+    [videoPicker_ startCaptureWithEncoder:ve audio:ae captureBlock:^{
+      
     }];
+    
+    /*
+    [videoPicker_ startCaptureWithBlock:^(CMSampleBufferRef sampleBuffer,
+                                          IFCapturedBufferType type) {
+      CMFormatDescriptionRef formatDescription =
+          CMSampleBufferGetFormatDescription(sampleBuffer);
+      if (type == kBufferVideo) {
+        CMVideoDimensions videoDementions =
+            CMVideoFormatDescriptionGetDimensions(formatDescription);
+        // CMVideoCodecType videoType = CMFormatDescriptionGetMediaSubType(formatDescription);
+        
+        NSLog(@"Video stream coming, %dx%d", videoDementions.width,
+              videoDementions.height);
+      } else if (type == kBufferAudio) {
+        NSLog(@"Audio stream coming");
+      }
+    }];
+     */
   }
 }
 
