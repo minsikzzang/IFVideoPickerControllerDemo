@@ -26,13 +26,14 @@
   encoder.bitRate = bitRate;
   encoder.sampleRate = sampleRate;
   encoder.codec = kAudioFormatMPEG4AAC;
+  [encoder setupWithFormatDescription:nil];
   return encoder;
 }
 
 - (void)setupWithFormatDescription:(CMFormatDescriptionRef)formatDescription {
+  /*
   const AudioStreamBasicDescription *asbd =
       CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription);
-  
 	size_t aclSize = 0;
 	const AudioChannelLayout *channelLayout =
       CMAudioFormatDescriptionGetChannelLayout(formatDescription, &aclSize);
@@ -43,14 +44,15 @@
 	if (channelLayout && aclSize > 0)
 		channelLayoutData = [NSData dataWithBytes:channelLayout length:aclSize];
 	else
-		channelLayoutData = [NSData data];
+   */
+  NSData *channelLayoutData = [NSData data];
 	
 	NSDictionary *audioCompressionSettings =
       [NSDictionary dictionaryWithObjectsAndKeys:
           [NSNumber numberWithInteger:codec], AVFormatIDKey,
           [NSNumber numberWithFloat:sampleRate], AVSampleRateKey,
           [NSNumber numberWithInt:bitRate], AVEncoderBitRatePerChannelKey,
-          [NSNumber numberWithInteger:asbd->mChannelsPerFrame], AVNumberOfChannelsKey,
+          [NSNumber numberWithInteger:1], AVNumberOfChannelsKey,
           channelLayoutData, AVChannelLayoutKey,
           nil];
 	AVAssetWriterInput *newWriterInput =

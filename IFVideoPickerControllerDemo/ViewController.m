@@ -40,9 +40,9 @@
   } else {
     self.textView.text = @"Recording...";
     
-    // audio 320kbos, samplerate 44100
+    // audio 64kbos, samplerate 44100
     IFAudioEncoder *ae =
-        [IFAudioEncoder createAACAudioWithBitRate:320000 sampleRate:44100];
+        [IFAudioEncoder createAACAudioWithBitRate:64000 sampleRate:44100];
     
     // video 500kbps, 512x288
     CMVideoDimensions dimensions;
@@ -53,8 +53,10 @@
         [IFVideoEncoder createH264VideoWithDimensions:dimensions
                                               bitRate:500000
                                           maxKeyFrame:200];
-    [videoPicker_ startCaptureWithEncoder:ve audio:ae captureBlock:^{
-      
+    [videoPicker_ startCaptureWithEncoder:ve
+                                    audio:ae
+                             captureBlock:^(NSData *buffer){
+      NSLog(@"buffer: %d bytes", [buffer length]);
     }];
     
     /*

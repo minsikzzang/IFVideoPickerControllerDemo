@@ -9,15 +9,13 @@
 #import "IFVideoPicker.h"
 #import "IFVideoEncoder.h"
 #import "IFAudioEncoder.h"
-#import "IFAVAssetBaseEncoder.h"
 
 @interface IFVideoPicker () <AVCaptureVideoDataOutputSampleBufferDelegate,
     AVCaptureAudioDataOutputSampleBufferDelegate> {
   id deviceConnectedObserver;
   id deviceDisconnectedObserver;
   captureHandler sampleBufferHandler_;
-  encodedCaptureHandler encodedBufferHandler_;
-  IFAVAssetBaseEncoder *assetEncoder_;
+  IFAVAssetEncoder *assetEncoder_;
 }
 
 - (AVCaptureDevice *)cameraWithPosition:(AVCaptureDevicePosition)position;
@@ -46,8 +44,6 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
 @synthesize videoPreviewView;
 @synthesize isCapturing;
 @synthesize session;
-@synthesize videoEncoder;
-@synthesize audioEncoder;
 
 - (id)init {
   self = [super init];
@@ -235,8 +231,6 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
   SAFE_RELEASE(audioBufferOutput)
   SAFE_RELEASE(videoInput)
   SAFE_RELEASE(audioInput)
-  SAFE_RELEASE(audioEncoder)
-  SAFE_RELEASE(videoEncoder)
 }
 
 - (void)startPreview:(UIView *)view {
@@ -298,7 +292,8 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
   SAFE_RELEASE(videoPreviewView)
 }
 
-// Find a camera with the specificed AVCaptureDevicePosition, returning nil if one is not found
+// Find a camera with the specificed AVCaptureDevicePosition, returning nil if
+// one is not found
 - (AVCaptureDevice *) cameraWithPosition:(AVCaptureDevicePosition) position {
   NSArray *devices = [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo];
   for (AVCaptureDevice *device in devices) {
@@ -353,17 +348,16 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
 - (void)startCaptureWithEncoder:(IFVideoEncoder *)video
                           audio:(IFAudioEncoder *)audio
                    captureBlock:(encodedCaptureHandler)captureBlock {
-  videoEncoder = video;
-  audioEncoder = audio;
-  
   // In order to use hardware acceleration encoding, we need to use
   // AVAssetsWriter, and AVAssetsWriter only writes to file, so we need to
   // create a file to contain encoded buffer and notify to captureBlock when
   // change is detcted.
   if (assetEncoder_ == nil) {
-    assetEncoder_ = [[IFAVAssetBaseEncoder alloc] init];
+    assetEncoder_ = [IFAVAssetEncoder mpeg4BaseEncoder];
+    assetEncoder_.videoEncoder = video;
+    assetEncoder_.audioEncoder = audio;
+    assetEncoder_.captureHandler = captureBlock;
   }
-  
 
   [self startCapture];
 }
@@ -373,9 +367,13 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
     return;
   }
   
-  // Clean up video and audio encoder objects which might have been set eariler.
-  SAFE_RELEASE(audioEncoder)
-  SAFE_RELEASE(videoEncoder)
+  // Clean up encoder objects which might have been set eariler.
+  if (assetEncoder_ != nil) {
+    [assetEncoder_ stopWithSaveToAlbum:YES];
+    [assetEncoder_ release];
+    assetEncoder_ = nil;
+  }
+  
   
   // If needed, stop before changing in current session.
   // [self.session stopRunning];
@@ -416,20 +414,8 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
     bufferType = kBufferAudio;
   }
   
-  if (videoEncoder != nil && audioEncoder != nil) {
-    if (encodedBufferHandler_ != nil) {
-      if (bufferType == kBufferAudio) {
-        // If audio encoder is not ready to write, we need to setup it up with
-        // CMFormatDescriptionRef
-        if (audioEncoder.assetWriterInput == nil) {
-          CMFormatDescriptionRef formatDescription =
-              CMSampleBufferGetFormatDescription(sampleBuffer);
-          [audioEncoder setupWithFormatDescription:formatDescription];
-        }
-      }
-    } else {
-      NSLog(@"No encoded buffer capture handler exist");
-    }
+  if (assetEncoder_ != nil) {
+    [assetEncoder_ encodeSampleBuffer:sampleBuffer ofType:bufferType];
   } else {
     if (sampleBufferHandler_ != nil) {
       sampleBufferHandler_(sampleBuffer, bufferType);

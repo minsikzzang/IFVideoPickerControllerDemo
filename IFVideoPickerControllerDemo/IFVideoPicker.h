@@ -14,19 +14,10 @@
 #import "AVFoundation/AVCaptureInput.h"
 #import "AVFoundation/AVCaptureVideoPreviewLayer.h"
 #import "AVFoundation/AVMediaFormat.h"
-
-typedef enum {
-  kBufferUnknown = 0,
-  kBufferVideo,
-  kBufferAudio
-} IFCapturedBufferType;
+#import "IFAVAssetEncoder.h"
 
 typedef void (^captureHandler)(CMSampleBufferRef sampleBuffer,
                                IFCapturedBufferType type);
-typedef void (^encodedCaptureHandler)(void);
-
-@class IFVideoEncoder;
-@class IFAudioEncoder;
 
 @interface IFVideoPicker : NSObject {
   
@@ -39,8 +30,6 @@ typedef void (^encodedCaptureHandler)(void);
 @property (nonatomic, retain) AVCaptureVideoPreviewLayer *captureVideoPreviewLayer;
 @property (nonatomic, retain) AVCaptureSession *session;
 @property (nonatomic, retain) UIView *videoPreviewView;
-@property (nonatomic, retain) IFVideoEncoder *videoEncoder;
-@property (nonatomic, retain) IFAudioEncoder *audioEncoder;
 @property (nonatomic, assign) BOOL isCapturing;
 
 - (BOOL)startup;
