@@ -64,6 +64,11 @@ typedef void (^captureHandler)(CMSampleBufferRef sampleBuffer,
                    captureBlock:(encodedCaptureHandler)captureBlock;
 
 
+- (void)startCaptureToFileWithEncoder:(IFVideoEncoder *)video
+                                audio:(IFAudioEncoder *)audio
+                              maxSize:(UInt64)maxSize
+                        progressBlock:(encodedProgressHandler)progressBlock;
+
 /**
  */
 - (void)stopCapture;

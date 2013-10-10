@@ -18,6 +18,7 @@ typedef enum {
 } IFCapturedBufferType;
 
 typedef void (^encodedCaptureHandler)(NSData *buffer);
+typedef void (^encodedProgressHandler)(NSString *outputPath);
 
 /**
  @abstract
@@ -34,7 +35,9 @@ typedef void (^encodedCaptureHandler)(NSData *buffer);
 @property (nonatomic, retain) IFAudioEncoder *audioEncoder;
 @property (nonatomic, retain) IFVideoEncoder *videoEncoder;
 @property (atomic, retain) NSFileHandle *outputFileHandle;
-@property (atomic, assign) encodedCaptureHandler captureHandler;
+@property (atomic, copy) encodedCaptureHandler captureHandler;
+@property (atomic, copy) encodedProgressHandler progressHandler;
+@property (atomic, assign) UInt64 maxFileSize;
 
 /**
  @abstract

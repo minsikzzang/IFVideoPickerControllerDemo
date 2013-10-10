@@ -362,6 +362,23 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
   [self startCapture];
 }
 
+- (void)startCaptureToFileWithEncoder:(IFVideoEncoder *)video
+                                audio:(IFAudioEncoder *)audio
+                              maxSize:(UInt64)maxSize
+                        progressBlock:(encodedProgressHandler)progressBlock {
+  // Write encoded buffer to random file as much as the give max size.
+  // Once the file reaches max size, notity to progressBlock.
+  if (assetEncoder_ == nil) {
+    assetEncoder_ = [IFAVAssetEncoder mpeg4BaseEncoder];
+    assetEncoder_.videoEncoder = video;
+    assetEncoder_.audioEncoder = audio;
+    assetEncoder_.maxFileSize = maxSize;
+    assetEncoder_.progressHandler = progressBlock;
+  }
+  
+  [self startCapture];
+}
+
 - (void)stopCapture {
   if (!isCapturing) {
     return;

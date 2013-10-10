@@ -19,6 +19,7 @@
   dispatch_source_t dispatchSource_;
   
   BOOL watchOutputFileReady_;
+  BOOL reInitializing_;
 }
 
 - (NSString *)getOutputFilePath:(NSString *)fileType;
@@ -31,12 +32,15 @@
 - (void)saveToAlbum:(NSURL *)url;
 - (void)watchOutputFile:(NSString *)filePath;
 
+@property (atomic, retain) NSString *fileType;
+
 @end
 
 @implementation IFAVAssetEncoder
 
 static const NSInteger kMaxTempFileLength = 1024 * 1024 * 5; // max file size
 NSString *const kAVAssetMP4Output = @"ifavassetout.mp4";
+NSString *const kAVAssetMP4OutputWithRandom = @"ifavassetout-%05d.mp4";
 const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue";
 
 @synthesize audioEncoder = audioEncoder_;
@@ -45,6 +49,9 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
 @synthesize outputURL;
 @synthesize outputFileHandle;
 @synthesize captureHandler;
+@synthesize progressHandler;
+@synthesize maxFileSize;
+@synthesize fileType;
 
 + (IFAVAssetEncoder *)mpeg4BaseEncoder {
   return [[IFAVAssetEncoder alloc] initWithFileType:AVFileTypeMPEG4];
@@ -54,10 +61,13 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
   return [[IFAVAssetEncoder alloc] initWithFileType:AVFileTypeQuickTimeMovie];
 }
 
-- (id)initWithFileType:(NSString *)fileType {
+- (id)initWithFileType:(NSString *)aFileType {
   self = [super init];
   if (self != nil) {
     watchOutputFileReady_ = NO;
+    maxFileSize = 0;
+    self.fileType = aFileType;
+    reInitializing_ = NO;
     
     // Generate temporary file path to store encoded file
     self.outputURL = [NSURL fileURLWithPath:[self getOutputFilePath:fileType]
@@ -110,7 +120,8 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
 - (NSString *)getOutputFilePath:(NSString *)fileType {
   // NSString *path = [self mediaPathForMediaType:@"videos"];
   NSString *path = NSTemporaryDirectory();
-  return [path stringByAppendingPathComponent:kAVAssetMP4Output];
+  return [path stringByAppendingPathComponent:
+          [NSString stringWithFormat:kAVAssetMP4OutputWithRandom, rand() % 99999]];
 }
 
 - (NSString *)mediaPathForMediaType:(NSString *)mediaType {
@@ -276,6 +287,77 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
           captureHandler(chunk);
         }
       }
+      
+      if (self.maxFileSize > 0) {
+        NSDictionary *attr =
+          [[NSFileManager defaultManager] attributesOfItemAtPath:filePath error:NULL];
+      
+        @synchronized(self) {
+          if (reInitializing_) {
+            // store incoming buffer in the queue
+            return;
+          }
+        }
+
+        if (maxFileSize <= [attr fileSize]) {
+          NSLog(@"total file size %lld, max %lld", [attr fileSize], self.maxFileSize);
+        
+          @synchronized(self) {
+            reInitializing_ = YES;
+          }
+          
+          // Finish current encoding
+          // Release all resources related AVAssetWriter
+          if (assetWriter.status == AVAssetWriterStatusWriting) {
+            @try {
+              [self.audioEncoder.assetWriterInput markAsFinished];
+              [self.videoEncoder.assetWriterInput markAsFinished];
+              
+              // Wait until it finishes
+              [assetWriter finishWritingWithCompletionHandler:^{
+                if (assetWriter.status == AVAssetWriterStatusFailed) {
+                  NSLog(@"Failed to finish writing: %@", [assetWriter error]);
+                } else {
+                  if (progressHandler) {
+                    progressHandler(filePath);
+                  }
+                }
+                
+                // Regardless of job failure, we need to reset current encoder
+                dispatch_source_cancel(dispatchSource_);
+              
+                // Once it's done, generate new file name and reinitiate AVAssetWrite
+                outputURL = [NSURL fileURLWithPath:[self getOutputFilePath:fileType]
+                                       isDirectory:NO];
+
+                // Delete the file if already exists
+                [[NSFileManager defaultManager] removeItemAtPath:outputURL.path error:nil];
+                
+                [assetWriter release];
+                NSError *error;
+                assetWriter = [[AVAssetWriter alloc] initWithURL:outputURL
+                                                        fileType:fileType
+                                                           error:&error];
+                
+                // setVideoEncoder and setAudioEncoder will retain the given
+                // encoder objects so we need to reduce reference as it's retained
+                // in the functions.
+                [assetWriter addInput:videoEncoder_.assetWriterInput];
+                [assetWriter addInput:audioEncoder_.assetWriterInput];
+                
+                // we are good to go.
+                @synchronized (self) {
+                  reInitializing_ = NO;  
+                }
+                
+                watchOutputFileReady_ = NO;
+              }];
+            } @catch (NSException *exception) {
+              NSLog(@"Caught exception: %@", [exception description]);
+            }
+          }
+        }
+      }      
     }
   });
   
