@@ -347,7 +347,8 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
 
 - (void)startCaptureWithEncoder:(IFVideoEncoder *)video
                           audio:(IFAudioEncoder *)audio
-                   captureBlock:(encodedCaptureHandler)captureBlock {
+                   captureBlock:(encodedCaptureHandler)captureBlock
+                   failureBlock:(encodingFailureHandler)failureBlock {
   // In order to use hardware acceleration encoding, we need to use
   // AVAssetsWriter, and AVAssetsWriter only writes to file, so we need to
   // create a file to contain encoded buffer and notify to captureBlock when
@@ -357,6 +358,7 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
     assetEncoder_.videoEncoder = video;
     assetEncoder_.audioEncoder = audio;
     assetEncoder_.captureHandler = captureBlock;
+    assetEncoder_.failureHandler = failureBlock;
   }
 
   [self startCapture];
@@ -370,6 +372,7 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
   // Once the file reaches max size, notity to progressBlock.
   if (assetEncoder_ == nil) {
     assetEncoder_ = [IFAVAssetEncoder mpeg4BaseEncoder];
+    // assetEncoder_ =  [IFAVAssetEncoder quickTimeMovieBaseEncoder];
     assetEncoder_.videoEncoder = video;
     assetEncoder_.audioEncoder = audio;
     assetEncoder_.maxFileSize = maxSize;

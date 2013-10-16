@@ -17,8 +17,9 @@ typedef enum {
   kBufferAudio
 } IFCapturedBufferType;
 
-typedef void (^encodedCaptureHandler)(NSData *buffer);
+typedef void (^encodedCaptureHandler)(NSArray *frames, NSData *buffer, double pts);
 typedef void (^encodedProgressHandler)(NSString *outputPath);
+typedef void (^encodingFailureHandler)(NSError *error);
 
 /**
  @abstract
@@ -31,12 +32,14 @@ typedef void (^encodedProgressHandler)(NSString *outputPath);
 }
 
 @property (atomic, retain) AVAssetWriter *assetWriter;
+@property (atomic, retain) AVAssetWriter *assetMetaWriter;
 @property (atomic, retain) NSURL *outputURL;
 @property (nonatomic, retain) IFAudioEncoder *audioEncoder;
 @property (nonatomic, retain) IFVideoEncoder *videoEncoder;
 @property (atomic, retain) NSFileHandle *outputFileHandle;
 @property (atomic, copy) encodedCaptureHandler captureHandler;
 @property (atomic, copy) encodedProgressHandler progressHandler;
+@property (atomic, copy) encodingFailureHandler failureHandler;
 @property (atomic, assign) UInt64 maxFileSize;
 
 /**

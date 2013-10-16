@@ -8,18 +8,26 @@
 
 #import "IFAVAssetEncoder.h"
 #import <AssetsLibrary/AssetsLibrary.h>
+#import <AVFoundation/AVAssetExportSession.h>
+#import <AVFoundation/AVMediaFormat.h>
 #import "IFAudioEncoder.h"
 #import "IFVideoEncoder.h"
+#import "NSData+Hex.h"
+#import "MP4Reader.h"
 
 @interface IFAVAssetEncoder () {
   IFVideoEncoder *videoEncoder_;
   IFAudioEncoder *audioEncoder_;
+  MP4Reader *mp4Reader_;
+  NSMutableArray *timeStamps_;
+  int firstPts_;
   
   dispatch_queue_t assetEncodingQueue_;
   dispatch_source_t dispatchSource_;
   
   BOOL watchOutputFileReady_;
   BOOL reInitializing_;
+  BOOL readMetaHedaer_;
 }
 
 - (NSString *)getOutputFilePath:(NSString *)fileType;
@@ -31,6 +39,11 @@
              toWriterInput:(AVAssetWriterInput *)writerInput;
 - (void)saveToAlbum:(NSURL *)url;
 - (void)watchOutputFile:(NSString *)filePath;
+- (BOOL)encodeSampleBuffer:(CMSampleBufferRef)sampleBuffer
+                    ofType:(IFCapturedBufferType)mediaType
+               assetWriter:(AVAssetWriter *)writer;
+- (void)addMediaInput:(AVAssetWriterInput *)input
+             toWriter:(AVAssetWriter *)writer;
 
 @property (atomic, retain) NSString *fileType;
 
@@ -46,6 +59,7 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
 @synthesize audioEncoder = audioEncoder_;
 @synthesize videoEncoder = videoEncoder_;
 @synthesize assetWriter;
+@synthesize assetMetaWriter;
 @synthesize outputURL;
 @synthesize outputFileHandle;
 @synthesize captureHandler;
@@ -66,15 +80,16 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
   if (self != nil) {
     watchOutputFileReady_ = NO;
     maxFileSize = 0;
+    firstPts_ = -1;
+    readMetaHedaer_ = NO;
     self.fileType = aFileType;
     reInitializing_ = NO;
+    mp4Reader_ = [[MP4Reader alloc] init];
+    timeStamps_ = [[NSMutableArray alloc] initWithCapacity:10];
     
     // Generate temporary file path to store encoded file
     self.outputURL = [NSURL fileURLWithPath:[self getOutputFilePath:fileType]
                                 isDirectory:NO];
-    
-    // Delete the file if already exists
-    [[NSFileManager defaultManager] removeItemAtPath:outputURL.path error:nil];
     
     // Create serila queue for encoding given buffer
     assetEncodingQueue_ =
@@ -84,6 +99,14 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
     self.assetWriter = [[AVAssetWriter alloc] initWithURL:outputURL
                                                  fileType:fileType
                                                     error:&error];
+    
+    NSURL *metaFile = [NSURL fileURLWithPath:[self getOutputFilePath:fileType]
+                                 isDirectory:NO];
+    
+    // We need to write one complete file to get 'moov' mp4 meta header
+    self.assetMetaWriter = [[AVAssetWriter alloc] initWithURL:metaFile
+                                                     fileType:fileType
+                                                        error:&error];
     if (error) {
       NSLog(@"Failed to create assetWriter - %@, %@",
             [error localizedDescription], [error userInfo]);
@@ -92,36 +115,36 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
   return self;
 }
 
-- (void)setVideoEncoder:(IFVideoEncoder *)videoEncoder {
-  if (assetWriter && videoEncoder.assetWriterInput &&
-      [assetWriter canAddInput:videoEncoder.assetWriterInput]) {
+- (void)addMediaInput:(AVAssetWriterInput *)input
+             toWriter:(AVAssetWriter *)writer {
+  if (writer && input && [writer canAddInput:input]) {
     @try {
-      [assetWriter addInput:videoEncoder.assetWriterInput];
-      videoEncoder_ = [videoEncoder retain];
+      [writer addInput:input];
     } @catch (NSException *exception) {
       NSLog(@"Couldn't add input: %@", [exception description]);
     }
   }
 }
 
+- (void)setVideoEncoder:(IFVideoEncoder *)videoEncoder {
+  // [self addMediaInput:videoEncoder.assetWriterInput toWriter:assetMetaWriter];
+  [self addMediaInput:videoEncoder.assetWriterInput toWriter:assetWriter];
+  videoEncoder_ = [videoEncoder retain];
+}
+
 - (void)setAudioEncoder:(IFAudioEncoder *)audioEncoder {
-  if (assetWriter && audioEncoder.assetWriterInput &&
-      [assetWriter canAddInput:audioEncoder.assetWriterInput]) {
-    @try {
-      [assetWriter addInput:audioEncoder.assetWriterInput];
-    } @catch (NSException *exception) {
-      NSLog(@"Couldn't add audio input: %@", [exception description]);
-    }
-  }
-  
+  // [self addMediaInput:audioEncoder_.assetWriterInput toWriter:assetMetaWriter];
+  [self addMediaInput:audioEncoder_.assetWriterInput toWriter:assetWriter];
   audioEncoder_ = [audioEncoder retain];
 }
 
 - (NSString *)getOutputFilePath:(NSString *)fileType {
   // NSString *path = [self mediaPathForMediaType:@"videos"];
   NSString *path = NSTemporaryDirectory();
-  return [path stringByAppendingPathComponent:
+  NSString *filePath =  [path stringByAppendingPathComponent:
           [NSString stringWithFormat:kAVAssetMP4OutputWithRandom, rand() % 99999]];
+  [[NSFileManager defaultManager] removeItemAtPath:filePath error:nil];
+  return filePath;
 }
 
 - (NSString *)mediaPathForMediaType:(NSString *)mediaType {
@@ -146,37 +169,96 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
   }
 }
 
-- (void)writeSampleBuffer:(CMSampleBufferRef)sampleBuffer
-                   ofType:(IFCapturedBufferType)mediaType {
-  if (assetWriter.status == AVAssetWriterStatusUnknown) {
-    if ([assetWriter startWriting]) {
+- (BOOL)encodeSampleBuffer:(CMSampleBufferRef)sampleBuffer
+                    ofType:(IFCapturedBufferType)mediaType
+               assetWriter:(AVAssetWriter *)writer {
+  if (!CMSampleBufferDataIsReady(sampleBuffer)) {
+    return NO;
+  }
+  
+  if (writer.status == AVAssetWriterStatusUnknown) {
+    if ([writer startWriting]) {
       @try {
-        [assetWriter
+        [writer
          startSessionAtSourceTime:CMSampleBufferGetPresentationTimeStamp(sampleBuffer)];
-        
-        if (!watchOutputFileReady_) {
-          [self watchOutputFile:[outputURL path]];
-        }
       }
       @catch (NSException *exception) {
         NSLog(@"Couldn't add audio input: %@", [exception description]);
+        return NO;
       }
 		} else {
-			NSLog(@"Failed to start writing(%@): %@", assetWriter.outputURL,
-            [assetWriter error]);
+			NSLog(@"Failed to start writing(%@): %@", writer.outputURL,
+            [writer error]);
+      return NO;
 		}
 	}
   
-  if (assetWriter.status == AVAssetWriterStatusWriting) {
+  if (writer.status == AVAssetWriterStatusWriting) {
     AVAssetWriterInput *input = nil;
     if (mediaType == kBufferVideo) {
       input = videoEncoder_.assetWriterInput;
     } else if (mediaType == kBufferAudio) {
       input = audioEncoder_.assetWriterInput;
+
     }
     
     if (input != nil) {
       [self appendSampleBuffer:sampleBuffer toWriterInput:input];
+    }
+  }
+
+  return YES;
+}
+
+- (void)handleMetaData {
+  NSData *movWithMoov =
+      [NSData dataWithContentsOfFile:assetMetaWriter.outputURL.path];
+  NSLog(@"%@", [movWithMoov hexString]);
+  
+  // Let's parse mp4 header
+  MP4Reader *mp4Reader = [[MP4Reader alloc] init];
+  [mp4Reader readData:movWithMoov];
+  
+  // if (!watchOutputFileReady_) {
+  [self watchOutputFile:[outputURL path]];
+  // }
+}
+
+- (void)writeSampleBuffer:(CMSampleBufferRef)sampleBuffer
+                   ofType:(IFCapturedBufferType)mediaType {
+  
+  // @synchronized (self) {
+    if (!readMetaHedaer_) {
+      // If we don't finish writing in AVAssetWriter, we never get 'moov' section
+      // for parsing mp4 file.
+      readMetaHedaer_ = YES;
+      
+      /*
+      if ([self encodeSampleBuffer:sampleBuffer
+                            ofType:mediaType
+                       assetWriter:assetMetaWriter]) {
+        // We finish encoding here for meta data
+        [assetMetaWriter finishWritingWithCompletionHandler:^{
+          [self handleMetaData];
+        }];
+      }
+       */
+    } 
+  // }
+  
+  CMTime prestime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+  double dPTS = (double)(prestime.value) / prestime.timescale;
+  NSNumber* pts = [NSNumber numberWithDouble:dPTS];
+  @synchronized (timeStamps_) {
+    [timeStamps_ addObject:pts];
+  }
+  
+  if ([self encodeSampleBuffer:sampleBuffer
+                        ofType:mediaType
+                   assetWriter:assetWriter]) {
+    if (!watchOutputFileReady_) {
+      watchOutputFileReady_ = YES;
+      [self watchOutputFile:[outputURL path]];
     }
   }
 }
@@ -190,7 +272,15 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
       CMFormatDescriptionRef formatDescription =
           CMSampleBufferGetFormatDescription(sampleBuffer);
       [audioEncoder_ setupWithFormatDescription:formatDescription];
-      
+/*
+      if (assetMetaWriter && [assetMetaWriter canAddInput:self.audioEncoder.assetWriterInput]) {
+        @try {
+          [assetMetaWriter addInput:audioEncoder_.assetWriterInput];
+        } @catch (NSException *exception) {
+          NSLog(@"Couldn't add audio input: %@", [exception description]);
+        }
+      }
+  */
       if (assetWriter && [assetWriter canAddInput:self.audioEncoder.assetWriterInput]) {
         @try {
           [assetWriter addInput:audioEncoder_.assetWriterInput];
@@ -283,8 +373,23 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
     if (flags & DISPATCH_VNODE_EXTEND) {
       NSData *chunk = [outputFileHandle readDataToEndOfFile];
       if ([chunk length] > 0) {
+        // NSLog(@"Actual data\n%@", [chunk hexString]);
         if (captureHandler) {
-          captureHandler(chunk);
+          double pts = 0;
+          @synchronized (timeStamps_) {
+            if ([timeStamps_ count] > 0) {
+              pts = [timeStamps_[0] doubleValue];
+              [timeStamps_ removeObjectAtIndex:0];
+              if (firstPts_ < 0) {
+                firstPts_ = pts;
+              }
+            } else {
+              NSLog(@"no pts for buffer");
+            }
+          }
+
+          NSArray *frames = [mp4Reader_ readFrame:chunk];
+          captureHandler(frames, chunk, pts);
         }
       }
       
@@ -310,8 +415,10 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
           // Release all resources related AVAssetWriter
           if (assetWriter.status == AVAssetWriterStatusWriting) {
             @try {
-              [self.audioEncoder.assetWriterInput markAsFinished];
-              [self.videoEncoder.assetWriterInput markAsFinished];
+              @synchronized (self) {
+                [self.audioEncoder.assetWriterInput markAsFinished];
+                [self.videoEncoder.assetWriterInput markAsFinished];
+              }
               
               // Wait until it finishes
               [assetWriter finishWritingWithCompletionHandler:^{
@@ -330,9 +437,6 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
                 outputURL = [NSURL fileURLWithPath:[self getOutputFilePath:fileType]
                                        isDirectory:NO];
 
-                // Delete the file if already exists
-                [[NSFileManager defaultManager] removeItemAtPath:outputURL.path error:nil];
-                
                 [assetWriter release];
                 NSError *error;
                 assetWriter = [[AVAssetWriter alloc] initWithURL:outputURL
@@ -370,6 +474,9 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
 }
 
 - (void)dealloc {
+  [timeStamps_ release];
+  [mp4Reader_ release];
+  
   if (self.audioEncoder) {
     [self.audioEncoder release];
   }
@@ -380,6 +487,10 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
   
   if (assetWriter) {
     [assetWriter release];
+  }
+  
+  if (assetMetaWriter) {
+    [assetMetaWriter release];
   }
   
   if (outputURL) {

@@ -61,8 +61,8 @@ typedef void (^captureHandler)(CMSampleBufferRef sampleBuffer,
  */
 - (void)startCaptureWithEncoder:(IFVideoEncoder *)video
                           audio:(IFAudioEncoder *)audio
-                   captureBlock:(encodedCaptureHandler)captureBlock;
-
+                   captureBlock:(encodedCaptureHandler)captureBlock
+                   failureBlock:(encodingFailureHandler)failureBlock;
 
 - (void)startCaptureToFileWithEncoder:(IFVideoEncoder *)video
                                 audio:(IFAudioEncoder *)audio
