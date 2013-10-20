@@ -331,10 +331,11 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
     [session addOutput:videoBufferOutput];
   }
   
+  /*
   if ([session canAddOutput:audioBufferOutput]) {
     [session addOutput:audioBufferOutput];
   }
-
+*/
   // Now, we are capturing
   [self setIsCapturing:YES];
 }
