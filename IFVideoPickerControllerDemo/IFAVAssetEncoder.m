@@ -14,7 +14,9 @@
 #import "IFVideoEncoder.h"
 #import "NSData+Hex.h"
 #import "MP4Reader.h"
+#import "MP4Frame.h"
 #import "IFBytesData.h"
+#import "NALUnit.h"
 
 @interface IFAVAssetEncoder () {
   IFVideoEncoder *videoEncoder_;
@@ -22,14 +24,17 @@
   MP4Reader *mp4Reader_;
   NSMutableArray *timeStamps_;
   int firstPts_;
+  NALUnit *previousNalu;
+  NSMutableArray *pendingNalu_;
+  BOOL YOYOYO;
   
   dispatch_queue_t assetEncodingQueue_;
   dispatch_source_t dispatchSource_;
   
   BOOL watchOutputFileReady_;
   BOOL reInitializing_;
-  BOOL readMetaHedaer_;
-  BOOL readMetaHeaderFinish_;
+  BOOL readMetaHeader_;
+  BOOL readMetaHeaderFinished_;
 }
 
 - (NSString *)getOutputFilePath:(NSString *)fileType;
@@ -46,6 +51,7 @@
                assetWriter:(AVAssetWriter *)writer;
 - (void)addMediaInput:(AVAssetWriterInput *)input
              toWriter:(AVAssetWriter *)writer;
+- (double)getOldestPts;
 
 @property (atomic, retain) NSString *fileType;
 
@@ -66,6 +72,7 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
 @synthesize outputFileHandle;
 @synthesize captureHandler;
 @synthesize progressHandler;
+@synthesize metaHeaderHandler;
 @synthesize maxFileSize;
 @synthesize fileType;
 
@@ -83,12 +90,15 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
     watchOutputFileReady_ = NO;
     maxFileSize = 0;
     firstPts_ = -1;
-    readMetaHedaer_ = NO;
-    readMetaHeaderFinish_ = NO;
+    readMetaHeader_ = NO;
+    readMetaHeaderFinished_ = NO;
     self.fileType = aFileType;
     reInitializing_ = NO;
     mp4Reader_ = [[MP4Reader alloc] init];
     timeStamps_ = [[NSMutableArray alloc] initWithCapacity:10];
+    previousNalu = nil;
+    pendingNalu_ = [[NSMutableArray alloc] initWithCapacity:2];
+    YOYOYO = NO;
     
     // Generate temporary file path to store encoded file
     self.outputURL = [NSURL fileURLWithPath:[self getOutputFilePath:fileType]
@@ -130,14 +140,14 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
 }
 
 - (void)setVideoEncoder:(IFVideoEncoder *)videoEncoder {
-  // [self addMediaInput:videoEncoder.assetWriterInput toWriter:assetMetaWriter];
+  [self addMediaInput:videoEncoder.assetWriterInput toWriter:assetMetaWriter];
   [self addMediaInput:videoEncoder.assetWriterInput toWriter:assetWriter];
   videoEncoder_ = [videoEncoder retain];
 }
 
 - (void)setAudioEncoder:(IFAudioEncoder *)audioEncoder {
-  // [self addMediaInput:audioEncoder_.assetWriterInput toWriter:assetMetaWriter];
-  [self addMediaInput:audioEncoder_.assetWriterInput toWriter:assetWriter];
+  [self addMediaInput:audioEncoder.assetWriterInput toWriter:assetMetaWriter];
+  [self addMediaInput:audioEncoder.assetWriterInput toWriter:assetWriter];
   audioEncoder_ = [audioEncoder retain];
 }
 
@@ -184,18 +194,18 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
   if (writer.status == AVAssetWriterStatusUnknown) {
     if ([writer startWriting]) {
       @try {
-        [writer
-         startSessionAtSourceTime:CMSampleBufferGetPresentationTimeStamp(sampleBuffer)];
+        CMTime startTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+        [writer startSessionAtSourceTime:startTime];
       }
       @catch (NSException *exception) {
         NSLog(@"Couldn't add audio input: %@", [exception description]);
         return NO;
       }
-		} else {
-			NSLog(@"Failed to start writing(%@): %@", writer.outputURL,
+    } else {
+      NSLog(@"Failed to start writing(%@): %@", writer.outputURL,
             [writer error]);
       return NO;
-		}
+    }
 	}
   
   if (writer.status == AVAssetWriterStatusWriting) {
@@ -217,34 +227,38 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
 - (void)handleMetaData {
   NSData *movWithMoov =
       [NSData dataWithContentsOfFile:assetMetaWriter.outputURL.path];
-  NSLog(@"%@", [movWithMoov hexString]);
+  // NSLog(@"%@", [movWithMoov hexString]);
   
   // Let's parse mp4 header
   MP4Reader *mp4Reader = [[MP4Reader alloc] init];
   [mp4Reader readData:[IFBytesData dataWithNSData:movWithMoov]];
 
-  @synchronized (self) {
-    readMetaHeaderFinish_ = YES;
+  /*
+  if (metaHeaderHandler) {
+    metaHeaderHandler(mp4Reader);
   }
+  */
   
+  // NSLog(@"%@", [mp4Reader.videoDecoderBytes hexString]);
   [assetMetaWriter release];
   assetMetaWriter = nil;
+  
+  @synchronized (self) {
+    readMetaHeaderFinished_ = YES;
+  }
 }
 
 - (void)writeSampleBuffer:(CMSampleBufferRef)sampleBuffer
                    ofType:(IFCapturedBufferType)mediaType {
-  
   @synchronized (self) {
-    if (!readMetaHedaer_) {
+    if (!readMetaHeader_) {
       // If we don't finish writing in AVAssetWriter, we never get 'moov' section
       // for parsing mp4 file.
-      // readMetaHedaer_ = YES;
-      
       if ([self encodeSampleBuffer:sampleBuffer
                             ofType:mediaType
                        assetWriter:assetMetaWriter]) {
         // We finish encoding here for meta data
-        readMetaHedaer_ = YES;
+        readMetaHeader_ = YES;
         [assetMetaWriter finishWritingWithCompletionHandler:^{
           [self handleMetaData];
         }];
@@ -252,53 +266,31 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
     } 
   }
   
+  @synchronized (self) {
+    if (!readMetaHeaderFinished_) {
+      // If the meta header hasn't parsed yet, we don't start encoding.
+      return;
+    }
+  }
+  
   CMTime prestime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
-  double dPTS = (double)(prestime.value) / prestime.timescale;
-  NSNumber* pts = [NSNumber numberWithDouble:dPTS];
+  double ptsInNumber = (double)(prestime.value) / prestime.timescale;
+  NSNumber *pts = [NSNumber numberWithDouble:ptsInNumber];
   @synchronized (timeStamps_) {
     [timeStamps_ addObject:pts];
   }
-  
+
   if ([self encodeSampleBuffer:sampleBuffer
                         ofType:mediaType
                    assetWriter:assetWriter]) {
-    @synchronized (self) {
-      if (!watchOutputFileReady_ && readMetaHeaderFinish_) {
-        watchOutputFileReady_ = YES;
-        [self watchOutputFile:[outputURL path]];
-      }
+    if (!watchOutputFileReady_) {
+      [self watchOutputFile:[outputURL path]];
     }
   }
 }
 
 - (void)encodeSampleBuffer:(CMSampleBufferRef)sampleBuffer
                     ofType:(IFCapturedBufferType)mediaType {
-  if (mediaType == kBufferAudio) {
-    // If audio encoder is not ready to write, we need to setup it up with
-    // CMFormatDescriptionRef
-    if (audioEncoder_.assetWriterInput == nil) {
-      CMFormatDescriptionRef formatDescription =
-          CMSampleBufferGetFormatDescription(sampleBuffer);
-      [audioEncoder_ setupWithFormatDescription:formatDescription];
-/*
-      if (assetMetaWriter && [assetMetaWriter canAddInput:self.audioEncoder.assetWriterInput]) {
-        @try {
-          [assetMetaWriter addInput:audioEncoder_.assetWriterInput];
-        } @catch (NSException *exception) {
-          NSLog(@"Couldn't add audio input: %@", [exception description]);
-        }
-      }
-  */
-      if (assetWriter && [assetWriter canAddInput:self.audioEncoder.assetWriterInput]) {
-        @try {
-          [assetWriter addInput:audioEncoder_.assetWriterInput];
-        } @catch (NSException *exception) {
-          NSLog(@"Couldn't add audio input: %@", [exception description]);
-        }
-      }
-    }
-  }
-  
   CFRetain(sampleBuffer);
   
   // We'd like encoding job running asynchronously
@@ -353,12 +345,28 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
   }
 }
 
+- (double)getOldestPts {
+  double pts = 0;
+  @synchronized (timeStamps_) {
+    if ([timeStamps_ count] > 0) {
+      pts = [timeStamps_[0] doubleValue];
+      [timeStamps_ removeObjectAtIndex:0];
+      if (firstPts_ < 0) {
+        firstPts_ = pts;
+      }
+    } else {
+      NSLog(@"no pts for buffer");
+    }
+  }
+  return pts;
+}
+
 - (void)watchOutputFile:(NSString *)filePath {
   dispatch_queue_t queue =
       dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
   // int file = open([filePath UTF8String], O_EVTONLY);
-  self.outputFileHandle = [NSFileHandle fileHandleForReadingAtPath:filePath];
   
+  self.outputFileHandle = [NSFileHandle fileHandleForReadingAtPath:filePath];
   dispatchSource_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_VNODE,
                                            [outputFileHandle fileDescriptor],
                                            DISPATCH_VNODE_DELETE |
@@ -379,28 +387,168 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
     
     // When file size has changed,
     if (flags & DISPATCH_VNODE_EXTEND) {
+      // unsigned long long currentOffset = [outputFileHandle offsetInFile];
       NSData *chunk = [outputFileHandle readDataToEndOfFile];
-      if ([chunk length] > 0) {
-        // NSLog(@"Actual data\n%@", [chunk hexString]);
-        if (captureHandler) {
-          double pts = 0;
-          @synchronized (timeStamps_) {
-            if ([timeStamps_ count] > 0) {
-              pts = [timeStamps_[0] doubleValue];
-              [timeStamps_ removeObjectAtIndex:0];
-              if (firstPts_ < 0) {
-                firstPts_ = pts;
+      // if ([chunk length] > 0) {
+      if ([chunk length] > 8192) {
+      // if ([chunk length] > 409600) {
+        if (assetWriter.status == AVAssetWriterStatusWriting) {
+          @try {
+            @synchronized (self) {
+              [self.audioEncoder.assetWriterInput markAsFinished];
+              [self.videoEncoder.assetWriterInput markAsFinished];
+            }
+            
+            // Regardless of job failure, we need to reset current encoder
+            dispatch_source_cancel(dispatchSource_);
+            
+            // Wait until it finishes
+            [assetWriter finishWritingWithCompletionHandler:^{
+              if (assetWriter.status == AVAssetWriterStatusFailed) {
+                NSLog(@"Failed to finish writing: %@", [assetWriter error]);
+              } else {
+                NSData *movWithMoov =
+                  [NSData dataWithContentsOfFile:assetWriter.outputURL.path];
+                
+                // Let's parse mp4 header
+                MP4Reader *mp4Reader = [[MP4Reader alloc] init];
+                [mp4Reader readData:[IFBytesData dataWithNSData:movWithMoov]];
+                NSArray *frames = [mp4Reader readFrames];
+                // double pts = [self getOldestPts];
+                
+                if (!YOYOYO && metaHeaderHandler) {
+                  YOYOYO = YES;
+                  metaHeaderHandler(mp4Reader);
+                }
+                
+                if (captureHandler) {
+                  captureHandler(frames, movWithMoov);
+                  // captureHandler(frames, movWithMoov, pts - firstPts_);
+                }
+                
+                // NSLog(@"%@", [mp4Reader.videoDecoderBytes hexString]);
+                [assetMetaWriter release];
+                assetMetaWriter = nil;
+
               }
-            } else {
-              NSLog(@"no pts for buffer");
+              
+              // Once it's done, generate new file name and reinitiate AVAssetWrite
+              outputURL = [NSURL fileURLWithPath:[self getOutputFilePath:fileType]
+                                     isDirectory:NO];
+              
+              [assetWriter release];
+              NSError *error;
+              assetWriter = [[AVAssetWriter alloc] initWithURL:outputURL
+                                                      fileType:fileType
+                                                         error:&error];
+              
+              // setVideoEncoder and setAudioEncoder will retain the given
+              // encoder objects so we need to reduce reference as it's retained
+              // in the functions.
+              [assetWriter addInput:videoEncoder_.assetWriterInput];
+              [assetWriter addInput:audioEncoder_.assetWriterInput];
+              
+              // we are good to go.
+              @synchronized (self) {
+                watchOutputFileReady_ = NO;
+              }
+            }];
+          } @catch (NSException *exception) {
+            NSLog(@"Caught exception: %@", [exception description]);
+          }
+        }
+      } else {
+        [outputFileHandle seekToFileOffset:0];
+        /*
+        // NSLog(@"OUT - RAW CHUNK%@", [chunk hexString]);
+        NSArray *frames = [mp4Reader_ readFrames:[IFBytesData dataWithNSData:chunk]];
+        if (frames.count == 0) {
+          // We need more data, Let's go back to the point where it begins.
+          [outputFileHandle seekToFileOffset:currentOffset];
+        } else {
+          
+        }
+         */
+        /*
+          if (frames.count > 0) {
+            // Get last frame and check if there are enough size for it.
+            MP4Frame *f = [frames objectAtIndex:frames.count - 1];
+            if (f) {
+              if (f.offset + f.size + 4 > [chunk length]) {
+                // Current chunk doesn't have enough size of data
+                // Let's go back to the offset point and remove last frame.
+                [outputFileHandle seekToFileOffset:currentOffset];
+                
+                NSMutableArray *newFrames = [NSMutableArray arrayWithArray:frames];
+                [newFrames removeLastObject];
+                frames = newFrames;
+              }
+            }
+            
+            // Go through the encoded frames and combine multiple NALUs into a
+            // single frame, and in the process, convert to BSF by adding 00 00
+            // 01 startcodes before each NALU.
+            for (MP4Frame *f in frames) {
+              NSData *c = [NSData dataWithBytes:(char *)[chunk bytes] + f.offset
+                                         length:f.size];
+              NSLog(@"OUT - CHUNK%@", [c hexString:16]);
+              BOOL newNalUnit = NO;
+              NALUnit *nal =
+                [[NALUnit alloc] initWithData:[NSData dataWithBytes:[c bytes] + 4
+                                                             length:[c length] - 4]];
+              
+              if (previousNalu) {
+                if (previousNalu.nalRefIdc != nal.nalRefIdc &&
+                    previousNalu.nalRefIdc * nal.nalRefIdc == 0) {
+                  newNalUnit = YES;
+                } else if ((previousNalu.nalType != nal.nalType) &&
+                           ((nal.nalType == 5) || (previousNalu.nalType == 5))) {
+                  newNalUnit = YES;
+                } else if ((nal.nalType >= 1) && (nal.nalType <= 5)) {
+                  [nal skip:8];
+                  int firstMB = [nal getUE];
+                  if (firstMB == 0) {
+                    newNalUnit = YES;
+                  }
+                }
+              }
+              
+              if (newNalUnit) {
+                NSMutableData *outputNalu = [[NSMutableData alloc] init];
+                
+                // Merge several NALU chunks into one buffer
+                for (NSData *cc in pendingNalu_) {
+                  [outputNalu appendData:cc];
+                }
+               
+                double pts = [self getOldestPts];
+                NSLog(@"OUT - TS: %f", pts);
+                NSLog(@"OUT - NALU%@", [outputNalu hexString:16]);
+
+                if (captureHandler) {
+                  captureHandler(nil, outputNalu, pts - firstPts_);
+                }
+                [outputNalu release];
+                
+                [pendingNalu_ removeAllObjects];
+              }
+              
+              if (previousNalu) {
+                [previousNalu release];
+              }
+              
+              previousNalu = [nal retain];
+              // NSLog(@"0x%02x", nal.nalType);
+              [nal release];
+              
+              [pendingNalu_ addObject:chunk];
+
             }
           }
-
-          NSArray *frames = [mp4Reader_ readFrames:[IFBytesData dataWithNSData:chunk]];
-          captureHandler(frames, chunk, pts - firstPts_);
+         */
         }
       }
-      
+      /*
       if (self.maxFileSize > 0) {
         NSDictionary *attr =
           [[NSFileManager defaultManager] attributesOfItemAtPath:filePath error:NULL];
@@ -414,11 +562,11 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
 
         if (maxFileSize <= [attr fileSize]) {
           NSLog(@"total file size %lld, max %lld", [attr fileSize], self.maxFileSize);
-        
+       
           @synchronized(self) {
             reInitializing_ = YES;
           }
-          
+       
           // Finish current encoding
           // Release all resources related AVAssetWriter
           if (assetWriter.status == AVAssetWriterStatusWriting) {
@@ -469,8 +617,9 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
             }
           }
         }
-      }      
-    }
+      }   
+       */
+    
   });
   
   dispatch_source_set_cancel_handler(dispatchSource_, ^(void){
@@ -485,12 +634,20 @@ const char *kAssetEncodingQueue = "com.ifactorylab.ifassetencoder.encodingqueue"
   [timeStamps_ release];
   [mp4Reader_ release];
   
-  if (self.audioEncoder) {
-    [self.audioEncoder release];
+  if (previousNalu) {
+    [previousNalu release];
+  }
+
+  if (pendingNalu_) {
+    [pendingNalu_ release];
   }
   
-  if (self.videoEncoder) {
-    [self.videoEncoder release];
+  if (audioEncoder_) {
+    [audioEncoder_ release];
+  }
+  
+  if (videoEncoder_) {
+    [videoEncoder_ release];
   }
   
   if (assetWriter) {

@@ -10,6 +10,7 @@
 
 @class IFVideoEncoder;
 @class IFAudioEncoder;
+@class MP4Reader;
 
 typedef enum {
   kBufferUnknown = 0,
@@ -17,9 +18,13 @@ typedef enum {
   kBufferAudio
 } IFCapturedBufferType;
 
-typedef void (^encodedCaptureHandler)(NSArray *frames, NSData *buffer, double pts);
+typedef void (^encodedCaptureHandler)(NSArray *frames, NSData *buffer);
+typedef void (^encodedBufferCaptureHandler)(IFCapturedBufferType type,
+                                            NSData *buffer,
+                                            double ts);
 typedef void (^encodedProgressHandler)(NSString *outputPath);
 typedef void (^encodingFailureHandler)(NSError *error);
+typedef void (^encodingMetaHeaderHandler)(MP4Reader *reader);
 
 /**
  @abstract
@@ -40,6 +45,8 @@ typedef void (^encodingFailureHandler)(NSError *error);
 @property (atomic, copy) encodedCaptureHandler captureHandler;
 @property (atomic, copy) encodedProgressHandler progressHandler;
 @property (atomic, copy) encodingFailureHandler failureHandler;
+@property (atomic, copy) encodingMetaHeaderHandler metaHeaderHandler;
+@property (atomic, copy) encodedBufferCaptureHandler bufferCaptureHandler;
 @property (atomic, assign) UInt64 maxFileSize;
 
 /**

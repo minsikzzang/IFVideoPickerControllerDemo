@@ -62,7 +62,20 @@ typedef void (^captureHandler)(CMSampleBufferRef sampleBuffer,
 - (void)startCaptureWithEncoder:(IFVideoEncoder *)video
                           audio:(IFAudioEncoder *)audio
                    captureBlock:(encodedCaptureHandler)captureBlock
+                metaHeaderBlock:(encodingMetaHeaderHandler)metaHeaderBlock
                    failureBlock:(encodingFailureHandler)failureBlock;
+
+/**
+ @abstract
+ start capture YUV format video and audio stream from camera device. It returns
+ encoded format of video and audio output through captureBlock.
+ */
+- (void)startCaptureWithEncoder:(IFVideoEncoder *)video
+                          audio:(IFAudioEncoder *)audio
+                   captureBlock:(encodedCaptureHandler)captureBlock
+                metaHeaderBlock:(encodingMetaHeaderHandler)metaHeaderBlock
+                   failureBlock:(encodingFailureHandler)failureBlock;
+
 
 - (void)startCaptureToFileWithEncoder:(IFVideoEncoder *)video
                                 audio:(IFAudioEncoder *)audio

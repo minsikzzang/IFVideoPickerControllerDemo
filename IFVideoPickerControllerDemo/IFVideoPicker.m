@@ -325,17 +325,16 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
 
 // Add video and audio output objects to the current session to capture video
 // and audio stream from the session.
-- (void)startCapture {
+- (void)startCapture {  
   // Add video and audio output to current capture session.
   if ([session canAddOutput:videoBufferOutput]) {
     [session addOutput:videoBufferOutput];
   }
   
-  /*
   if ([session canAddOutput:audioBufferOutput]) {
     [session addOutput:audioBufferOutput];
   }
-*/
+
   // Now, we are capturing
   [self setIsCapturing:YES];
 }
@@ -349,6 +348,7 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
 - (void)startCaptureWithEncoder:(IFVideoEncoder *)video
                           audio:(IFAudioEncoder *)audio
                    captureBlock:(encodedCaptureHandler)captureBlock
+                metaHeaderBlock:(encodingMetaHeaderHandler)metaHeaderBlock
                    failureBlock:(encodingFailureHandler)failureBlock {
   // In order to use hardware acceleration encoding, we need to use
   // AVAssetsWriter, and AVAssetsWriter only writes to file, so we need to
@@ -360,6 +360,7 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
     assetEncoder_.audioEncoder = audio;
     assetEncoder_.captureHandler = captureBlock;
     assetEncoder_.failureHandler = failureBlock;
+    assetEncoder_.metaHeaderHandler = metaHeaderBlock;
   }
 
   [self startCapture];
@@ -395,7 +396,6 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
     assetEncoder_ = nil;
   }
   
-  
   // If needed, stop before changing in current session.
   // [self.session stopRunning];
   
@@ -417,16 +417,6 @@ const char *kAudioBufferQueueLabel = "com.ifactorylab.ifvideopicker.audioqueue";
 - (void) captureOutput:(AVCaptureOutput *)captureOutput
  didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
         fromConnection:(AVCaptureConnection *)connection {
-  /*
-   // CMTime timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
-   CMVideoDimensions videoDementions =
-   CMVideoFormatDescriptionGetDimensions(formatDescription);
-   // CMVideoCodecType videoType = CMFormatDescriptionGetMediaSubType(formatDescription);
-   
-   NSLog(@"Video stream coming, %dx%d", videoDementions.width,
-   videoDementions.height);
-   */
-
   IFCapturedBufferType bufferType = kBufferUnknown;
   if (connection == [videoBufferOutput connectionWithMediaType:AVMediaTypeVideo]) {
     bufferType = kBufferVideo;

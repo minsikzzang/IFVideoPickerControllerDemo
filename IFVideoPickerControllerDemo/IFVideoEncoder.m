@@ -61,7 +61,7 @@
       [[AVAssetWriterInput alloc] initWithMediaType:AVMediaTypeVideo
                                      outputSettings:videoCompressionSettings];
   newWriterInput.expectsMediaDataInRealTime = YES;
-  newWriterInput.transform = CGAffineTransformMakeRotation(M_PI/2);
+  // newWriterInput.transform = CGAffineTransformMakeRotation(M_PI/2);
   // newWriterInput.transform = [self transformFromCurrentVideoOrientationToOrientation:self.referenceOrientation];
   self.assetWriterInput = newWriterInput;
   self.dimensions = aDimensions;
